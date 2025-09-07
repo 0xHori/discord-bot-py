@@ -3,6 +3,8 @@ import sqlite3
 import disnake
 from disnake.ext import commands
 
+from utils.data import user_on_db_check
+
 
 class WithdrawCommand(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -23,26 +25,24 @@ class WithdrawCommand(commands.Cog):
         cursor = connection.cursor()
 
         """Если пользователя нет в базе данных, то мы его добавляем в неё."""
-        if (cursor.execute('SELECT * FROM data WHERE id = ?', (inter.user.id,))).fetchone() is None:
-            cursor.execute('INSERT INTO data(id, coin_hand, coin_bank, diamond) VALUES (?, ?, ?, ?)', (inter.user.id, 0, 0, 0))
-            connection.commit()
-            embed = disnake.Embed(title=f"{inter.user.name}, тебя в базе нет, я тебя добавил. какой витхдров блин")
+        await user_on_db_check(connection, cursor, inter.author.id)
+
+        res = cursor.execute('SELECT coin_hand, coin_bank FROM data WHERE id = ?', (inter.author.id,))
+        author_coin_hand, author_coin_bank = res.fetchone() # 1 на руках балик, 2 в банке балик
+
+        if author_coin_bank < amount:
+            embed = disnake.Embed(title=f"{inter.author.name}, брат у тебя столько денег нет, у тебя {author_coin_bank} на счету")
             await inter.response.send_message(embed=embed)
-        else:
-            res = cursor.execute('SELECT coin_hand, coin_bank FROM data WHERE id = ?', (inter.user.id,))
-            user_coin_hand, user_coin_bank = res.fetchone() # 1 на  балик, 2 в банке балик
-            if user_coin_bank < amount:
-                embed = disnake.Embed(title=f"{inter.user.name}, брат у тебя столько денег нет, у тебя {user_coin_bank} на счету")
-                await inter.response.send_message(embed=embed)
-            elif user_coin_bank >= amount:
-                # меняем балик в банке
-                cursor.execute('UPDATE data SET coin_bank = ? WHERE id = ?', (user_coin_bank - amount, inter.user.id))
-                connection.commit()
-                # меняем балик на руках
-                cursor.execute('UPDATE data SET coin_hand = ? WHERE id = ?', (user_coin_hand + amount, inter.user.id))
-                connection.commit()
-                embed = disnake.Embed(title=f"{inter.user.name}, ты снял со счёта {amount} валюты")
-                await inter.response.send_message(embed=embed)
+        elif author_coin_bank >= amount:
+            cursor.execute('UPDATE data SET coin_bank = ? WHERE id = ?', (author_coin_bank - amount, inter.author.id))
+            connection.commit()
+            cursor.execute('UPDATE data SET coin_hand = ? WHERE id = ?', (author_coin_hand + amount, inter.author.id))
+            connection.commit()
+            embed = disnake.Embed(title=f"{inter.author.name}, ты снял со счёта {amount} валюты")
+            await inter.response.send_message(embed=embed)
+
+        connection.close()
+
 
 
 def setup(bot: commands.Bot):

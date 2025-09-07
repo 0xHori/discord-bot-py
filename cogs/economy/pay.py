@@ -1,5 +1,6 @@
 import sqlite3
 
+from utils.data import user_on_db_check
 import disnake
 from disnake.ext import commands
 
@@ -24,15 +25,8 @@ class PayCommand(commands.Cog):
         connection = sqlite3.connect('./data/database.db')
         cursor = connection.cursor()
         """Если пользователя нет в базе данных, то мы его добавляем в неё."""
-        if (cursor.execute('SELECT * FROM data WHERE id = ?', (inter.author.id,))).fetchone() is None:
-            cursor.execute('INSERT INTO data(id, coin_hand, coin_bank, diamond) VALUES (?, ?, ?, ?)',
-                           (inter.user.id, 0, 0, 0,))
-            connection.commit()
-        if (cursor.execute('SELECT * FROM data WHERE id = ?', (member.id,))).fetchone() is None:
-            cursor.execute('INSERT INTO data(id, coin_hand, coin_bank, diamond) VALUES (?, ?, ?, ?)',
-                           (member.id, 0, 0, 0,))
-            connection.commit()
-
+        await user_on_db_check(connection, cursor, inter.author.id)
+        await user_on_db_check(connection, cursor, member.id)
 
         author_res = cursor.execute('SELECT coin_bank FROM data WHERE id = ?', (inter.author.id,))
         author_coin_bank, = author_res.fetchone()
@@ -40,19 +34,22 @@ class PayCommand(commands.Cog):
         member_res = cursor.execute('SELECT coin_bank FROM data WHERE id = ?', (member.id,))
         member_coin_bank, = member_res.fetchone()
 
-        if author_coin_bank < amount:
+        if inter.author.id == member.id:
+            embed = disnake.Embed(title=f"{inter.author.name}, переводить себе нельзя")
+            await inter.response.send_message(embed=embed, ephemeral=True)
+        elif author_coin_bank < amount:
             embed = disnake.Embed(
                 title=f"{inter.author.name}, брат у тебя столько денег нет, у тебя {author_coin_bank} на счету")
             await inter.response.send_message(embed=embed)
         elif author_coin_bank >= amount:
-            # меняем балик в банке отправителя средств
             cursor.execute('UPDATE data SET coin_bank = ? WHERE id = ?', (author_coin_bank - amount, inter.author.id))
-            connection.commit()
-            # меняем балик в банке получателя средств
             cursor.execute('UPDATE data SET coin_bank = ? WHERE id = ?', (member_coin_bank + amount, member.id))
             connection.commit()
+
             embed = disnake.Embed(title=f"{inter.author.name}, ты перевёл со своего банковского счёта {amount} валюты на банковский счёт {member.name}")
             await inter.response.send_message(embed=embed)
+
+        connection.close()
 
 
 
