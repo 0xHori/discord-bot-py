@@ -1,10 +1,8 @@
 import sqlite3
 
-connection = sqlite3.connect('../data/database.db')
+connection = sqlite3.connect('./../data/database.db')
 cursor = connection.cursor()
 
-
-# Создаем таблицу Users
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS data (
 id INTEGER PRIMARY KEY,
@@ -14,7 +12,5 @@ diamond INTEGER NOT NULL
 )
 ''')
 
-
-# Сохраняем изменения и закрываем соединение
 connection.commit()
 connection.close()

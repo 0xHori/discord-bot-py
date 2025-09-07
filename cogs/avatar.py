@@ -17,8 +17,9 @@ class AvatarCommand(commands.Cog):
             Чей аватар хочешь получить
 
         """
+
         member = member or inter.author
-        embed = disnake.Embed(title=f"Аватар {member}")
+        embed = disnake.Embed(title=f"Аватар {member.name}")
         embed.set_image(url=member.display_avatar.url)
         await inter.response.send_message(embed=embed)
 
